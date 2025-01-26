@@ -3,89 +3,25 @@
 #include <furi_hal_subghz.h>
 #include <furi.h>
 
-const FuriHalRegion furi_hal_region_zero = {
-    .country_code = "00",
-    .bands_count = 1,
+const FuriHalRegion furi_hal_region_no_limits = {
+    .country_code = "ALL",  // Use a generic country code to signify no limits
+    .bands_count = 1,  // Single band with no restrictions
     .bands = {
         {
-            .start = 0,
-            .end = 1000000000,
-            .power_limit = 12,
-            .duty_cycle = 50,
+            .start = 0,  // Start frequency set to 0 (no frequency restriction)
+            .end = 9999999999,  // End frequency set to a very high value (no upper limit)
+            .power_limit = 100,  // No power limit
+            .duty_cycle = 100,  // No duty cycle limit
         },
-    }};
+    }
+};
 
-const FuriHalRegion furi_hal_region_eu_ru = {
-    .country_code = "EU",
-    .bands_count = 2,
-    .bands = {
-        {
-            .start = 433050000,
-            .end = 434790000,
-            .power_limit = 12,
-            .duty_cycle = 50,
-        },
-        {
-            .start = 868150000,
-            .end = 868550000,
-            .power_limit = 12,
-            .duty_cycle = 50,
-        }}};
-
-const FuriHalRegion furi_hal_region_us_ca_au = {
-    .country_code = "US",
-    .bands_count = 3,
-    .bands = {
-        {
-            .start = 304100000,
-            .end = 321950000,
-            .power_limit = 12,
-            .duty_cycle = 50,
-        },
-        {
-            .start = 433050000,
-            .end = 434790000,
-            .power_limit = 12,
-            .duty_cycle = 50,
-        },
-        {
-            .start = 915000000,
-            .end = 928000000,
-            .power_limit = 12,
-            .duty_cycle = 50,
-        }}};
-
-const FuriHalRegion furi_hal_region_jp = {
-    .country_code = "JP",
-    .bands_count = 2,
-    .bands = {
-        {
-            .start = 312000000,
-            .end = 315250000,
-            .power_limit = 12,
-            .duty_cycle = 50,
-        },
-        {
-            .start = 920500000,
-            .end = 923500000,
-            .power_limit = 12,
-            .duty_cycle = 50,
-        }}};
-
+// Set the region to one with no restrictions
 static const FuriHalRegion* furi_hal_region = NULL;
 
 void furi_hal_region_init(void) {
-    FuriHalVersionRegion region = furi_hal_version_get_hw_region();
-
-    if(region == FuriHalVersionRegionUnknown) {
-        furi_hal_region = &furi_hal_region_zero;
-    } else if(region == FuriHalVersionRegionEuRu) {
-        furi_hal_region = &furi_hal_region_eu_ru;
-    } else if(region == FuriHalVersionRegionUsCaAu) {
-        furi_hal_region = &furi_hal_region_us_ca_au;
-    } else if(region == FuriHalVersionRegionJp) {
-        furi_hal_region = &furi_hal_region_jp;
-    }
+    // Always initialize to the region with no limits
+    furi_hal_region = &furi_hal_region_no_limits;
 }
 
 const FuriHalRegion* furi_hal_region_get(void) {
@@ -95,6 +31,7 @@ const FuriHalRegion* furi_hal_region_get(void) {
 void furi_hal_region_set(FuriHalRegion* region) {
     furi_check(region);
 
+    // Set the region to the new one, though we might always use no-limit region
     furi_hal_region = region;
 }
 
@@ -104,12 +41,28 @@ bool furi_hal_region_is_provisioned(void) {
 
 const char* furi_hal_region_get_name(void) {
     if(furi_hal_region) {
-        return furi_hal_region->country_code;
+        return furi_hal_region->country_code;  // Always return "ALL" (indicating no restrictions)
     } else {
         return "--";
     }
 }
 
+// Frequency check always returns true (bypasses any restriction)
+bool furi_hal_region_is_frequency_allowed(uint32_t frequency) {
+    return true;  // Always allow any frequency
+}
+
+// No region limit, always return the first band (which has no limits)
+const FuriHalRegionBand* furi_hal_region_get_band(uint32_t frequency) {
+    if(!furi_hal_region) {
+        return NULL;
+    }
+
+    // Always return the first band (it has no limits)
+    return &furi_hal_region->bands[0];
+}
+
+// No limits on frequency, always return true for any frequency
 bool _furi_hal_region_is_frequency_allowed(uint32_t frequency) {
     if(!furi_hal_region) {
         return false;
@@ -121,24 +74,4 @@ bool _furi_hal_region_is_frequency_allowed(uint32_t frequency) {
     }
 
     return true;
-}
-
-// Check furi_hal_subghz settings for region bypass, if not it uses function above
-bool furi_hal_region_is_frequency_allowed(uint32_t frequency) {
-    return furi_hal_subghz_is_tx_allowed(frequency);
-}
-
-const FuriHalRegionBand* furi_hal_region_get_band(uint32_t frequency) {
-    if(!furi_hal_region) {
-        return NULL;
-    }
-
-    for(size_t i = 0; i < furi_hal_region->bands_count; i++) {
-        if(furi_hal_region->bands[i].start <= frequency &&
-           furi_hal_region->bands[i].end >= frequency) {
-            return &furi_hal_region->bands[i];
-        }
-    }
-
-    return NULL;
 }
